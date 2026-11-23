@@ -1,0 +1,15 @@
+# Pack research-guard: restrito a docs/ e docs/links.txt.
+#
+# Habilite com `cli.py init --packs research-guard`: o init registra o hook PreToolUse abaixo em
+# .claude/settings.json. O comando nao usa aspas duplas e roda com cwd = raiz.
+
+[pack]
+name = "research-guard"
+description = "Hook PreToolUse do Claude Code que restringe busca/leitura web a docs/ e links.txt."
+rules = ["rules/research-policy.md"]
+
+[[hooks]]
+event = "PreToolUse"
+command = "python harness/packs/research-guard/scripts/research_guard.py"
+timeout = 30
+matcher = ""

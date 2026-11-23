@@ -1,0 +1,18 @@
+{
+  "tool_name": "MultiEdit",
+  "tool_input": {
+    "file_path": "/workspace/repo/src/app.py",
+    "edits": [
+      {
+        "old_string": "VALUE = 1",
+        "new_string": "VALUE = 2"
+      },
+      {
+        "old_string": "NAME = 'a'",
+        "new_string": "NAME = 'b'"
+      }
+    ]
+  },
+  "session_id": "ec33ebf9-0000-4100-8142-c61503f6c587",
+  "cwd": "/workspace/repo"
+}

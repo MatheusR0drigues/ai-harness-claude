@@ -1,0 +1,7 @@
+{
+  "name": "ai-harness",
+  "displayName": "AI Harness",
+  "version": "0.3.0",
+  "description": "Regras universais em PT-BR, skills de workflow e subagentes do Claude Code.",
+  "suggestedPrompts": []
+}
