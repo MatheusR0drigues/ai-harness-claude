@@ -4,21 +4,21 @@
     "harness/core.toml": "92f15877b2d3654afb9cc89a36ed99509ec334a093edd65dd6fa153e99919e10",
     "scripts/harness/check_code_risks.py": "c5ee38185f55ea28691d1007d50b12f5bc429130ce772c96b64718b56db2766a",
     "scripts/harness/check_controls.py": "15025cf2d731579b2657831b21b98eed2c9e384728bad3569b4abfc48727cae1",
-    "scripts/harness/check_secrets.py": "f24e9f30ea61a8806ba6248ab549bf7372985cee084a4e07c8b8324fcf507267",
+    "scripts/harness/check_secrets.py": "85819a062991627dfb4efaeab710eb938eced4a4343b0075ff85bf1e6808f7c3",
     "scripts/harness/check_structure.py": "021ddce76469fb9e258cdeb00420bb945552af476ffe819eaa666d7927154956",
     "scripts/harness/check_tamper.py": "8036c4133c09a23761c0c2844513dba92c34281bdf1e78ac4da24a88aaf39d5f",
     "scripts/harness/check_untrusted.py": "e9271830762b622045cb289d3f3941489a499abdc002106fa2fe665f3ac3ac1a",
     "scripts/harness/cli.py": "843ba851bc56118daa7641e49d03d6578966957c994819f73aee7ff3877841f8",
-    "scripts/harness/config.py": "a27cf2eae8a2abb7880783119b37ec06a47c0ab6cb094f2eabbad7634aa7c6d5",
+    "scripts/harness/config.py": "c9a4a39dd0a93222386190f2c49e6effaf32674d509f01268d4b8f4f5c5fdf2b",
     "scripts/harness/dialect.py": "057a4f0faffea3851c353ed392b0c650c360af5c7c32b2a7e6d7197a7f175f1d",
-    "scripts/harness/doctor.py": "c8d7bde3c9b4bc2f0096b1b87d8a3d61cd4dac673dfa263d5f122d4b3dae969b",
+    "scripts/harness/doctor.py": "45361d2afaf5c15f5e23a2440e106bc736f8b6257b62875ef694c2cb52ada5d6",
     "scripts/harness/guards.py": "e704a4b1e5eb16039264ee59d240c41d9f54777df0f285f8ef4fee8df9e7d15a",
     "scripts/harness/hook.py": "45c3ba9a7103a8b24e44fa1232b4f0e57d70bfc9e91f4f8d29be4ef9c4cfdc83",
     "scripts/harness/init.py": "2158565d0b471fe0858928c5988c2aa0f641032c91402965ed548861eca80c21",
     "scripts/harness/install_global.py": "39eda0e416ea467e8c873d9cfff3853b2503b978e3862cf7db7d74006d730f2a",
     "scripts/harness/payload.py": "f9c98082f82dae15ae5f9d094859c0ee623e392de85efe3eab259c6fd535c0ed",
     "scripts/harness/validate_spec.py": "01d3819a7bfad4a55b689e8a9d5a80344096fe0f0197c0cfcec2235419c9282d",
-    "scripts/harness/verify.py": "f5dd135018d646ee464008ef40445155eac749e27c71836ff44ef381c43c0064"
+    "scripts/harness/verify.py": "82aecbc0f6515a3736440a6ece3846acd54660151c942c4bf0d83e770f784bba"
   },
   "version": 2
 }

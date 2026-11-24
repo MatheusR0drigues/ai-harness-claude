@@ -15,7 +15,7 @@ O `ai-harness` separa o que é **global para todas as conversas** do que é **es
 
 | Superfície | Origem no repo | Onde atua | O que entrega |
 | :--- | :--- | :--- | :--- |
-| **Plugin Global** | `plugin/` | `~/.claude/` | Regras universais em PT-BR, 27 skills (`spec-driven`, `spec-fast-track`, `review`, `fix-bug`, `write-tests`, `verify-app`, `harness-setup`, `create-specialist` e 19 skills de domínio), 9 subagentes nativos e scripts auxiliares (`check_secrets.py`, `validate_spec.py`). **Não** injeta hooks globais nem altera `mcp_config.json`. |
+| **Plugin Global** | `plugin/` | `~/.claude/` | Regras universais em PT-BR, 29 skills (`spec-driven`, `spec-fast-track`, `review`, `fix-bug`, `write-tests`, `verify-app`, `harness-setup`, `create-specialist` e 21 skills de domínio), 9 subagentes nativos e scripts auxiliares (`check_secrets.py`, `validate_spec.py`). **Não** injeta hooks globais nem altera `mcp_config.json`. |
 | **Kit Local** | `scripts/harness/` + `harness/` | Cada repositório alvo via `cli.py init` | Hooks em `.claude/settings.json`, baseline obrigatório em `harness/core.toml`, guardas `PreToolUse`, contador de `Stop`, `check_tamper.py` + `harness/baseline.json`, runner `verify.py` e packs opt-in por stack. |
 
 Essa separação evita que hooks de código rodem em workspaces sem `scripts/harness/` e elimina sincronização automática entre múltiplos repositórios por CI ou GitHub App (o fluxo legado `propagate.yml` foi substituído por projeção explícita via `cli.py init`).

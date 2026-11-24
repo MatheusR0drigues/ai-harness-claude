@@ -308,3 +308,23 @@ def test_local_agents_check_pass_and_fail(tmp_path: Path) -> None:
     reserved = doctor.check_local_agents(tmp_path)
     assert reserved.ok is False
     assert "self" in reserved.detail
+
+
+def test_main_external_repo_root_and_config_passes_without_local_hooks(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    target = tmp_path / "external_target"
+    target.mkdir()
+    ext_cfg = tmp_path / "external-harness.toml"
+    ext_cfg.write_text('[project]\nname = "ext"\n', encoding="utf-8")
+
+    code = doctor.main(
+        ["--repo-root", str(target), "--config", str(ext_cfg)],
+        runner=FakeRunner(),
+        which=only_uv,
+    )
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "[PASS] hooks: external mode" in out
+    assert out.splitlines()[-1] == "DOCTOR PASSED"
