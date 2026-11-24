@@ -1,6 +1,7 @@
 """Static security checks of the repository's GitHub Actions workflows (stdlib text checks).
 
-- only the declared `ci.yml` and `sync-claude.yml` workflows exist (ADR-0012, ADR-0017);
+- only the declared `ci.yml`, `sync-claude.yml`, and `sync-openbot.yml` workflows exist
+  (ADR-0012, ADR-0017, ADR-0027);
 - every `uses:` is pinned to a full 40-hex commit SHA;
 - every workflow declares top-level read-only `permissions:`;
 - no `${{ ... }}` expression is interpolated inside a `run:` script;

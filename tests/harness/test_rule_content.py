@@ -116,6 +116,7 @@ SKILLS = (
     "streamlit-production",
     "resilience-patterns",
     "create-specialist",
+    "verify-app",
 )
 SUBAGENTS = (
     "researcher",
