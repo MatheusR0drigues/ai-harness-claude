@@ -72,9 +72,9 @@ Você atua como coordenador: delega aos subagentes, grava os documentos, executa
 - Delegue ao `implementer` com `model: sonnet` uma tarefa por vez, em ordem, com as dependências concluídas.
 - Se `verify --fast` falhar 1 vez no modelo leve, escale a 2ª tentativa para `model: inherit` levando o erro do sensor; na 2ª falha consecutiva da mesma abordagem, pare pelo ciclo anti-loop, registre em `progress.md` e mude a estratégia ou pergunte ao usuário.
 - Entre tarefas: `python scripts/harness/verify.py --fast` verde antes de seguir (sem kit local, os testes e lint rápidos do projeto).
-- Ao fim de cada tarefa, marque-a como `[x]` em `tasks.md` e atualize o bloco ativo de `progress.md` (paginação: mantenha o estado atual enxuto no topo).
+- Ao fim de cada tarefa, marque-a como `[x]` em `tasks.md`, atualize o bloco ativo de `progress.md` (paginação: mantenha o estado atual enxuto no topo) e faça `git commit` na branch da worktree após `verify --fast` verde.
 - Após a última tarefa: `python scripts/harness/verify.py` completo, `git diff --stat` relido e skill `review` com o `code-reviewer` em contexto novo, mais `security-auditor` se a mudança tocar autenticação, rede, entrada externa, segredos, permissões ou o harness.
-- **Gate 4:** `verify` completo verde, `VEREDITO: PASS` do revisor independente e aprovação do usuário para encerrar.
+- **Gate 4:** `verify` completo verde, `VEREDITO: PASS` do revisor independente e pedido explícito de permissão ao usuário antes de abrir o PR.
 
 ## Memória de Progresso
 

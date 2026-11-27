@@ -38,6 +38,7 @@ Se qualquer item falhar, promova imediatamente para `../spec-driven/SKILL.md` (T
 4. **Verificação rápida e fechamento:**
    - Execute os testes direcionados à mudança e o sensor rápido (`uv run python scripts/harness/verify.py --fast` ou equivalente do projeto).
    - Revise `git diff --stat` e o diff alterado garantindo zero código morto, zero comentários temporais e nenhum arquivo fora do escopo.
+   - Faça `git commit` na branch da worktree após o `verify --fast` verde; ao encerrar a demanda, faça push da branch e peça permissão explícita antes de abrir o PR.
    - Não é obrigatório acionar `code-reviewer` ou `security-auditor` em Tier 1 puro, salvo dúvida objetiva do autor ou risco percebido.
 
 ## Critério de Pronto (Tier 1)

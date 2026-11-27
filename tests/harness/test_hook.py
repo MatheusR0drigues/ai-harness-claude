@@ -55,3 +55,18 @@ def test_settings_json_matches_template() -> None:
 def test_unknown_agent_on_pre_is_denied() -> None:
     response = hook.run("antigravity", "pre", raw("claude", "read"))
     assert response.code == 2
+
+
+def test_pr_confirmation_emits_ask_json() -> None:
+    body = json.dumps(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "gh pr create --title demo"},
+        }
+    )
+    response = hook.run("claude", "pre", body, ())
+    assert response.code == 0
+    assert response.stderr == ""
+    doc = json.loads(response.stdout)
+    assert doc["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
+    assert doc["hookSpecificOutput"]["permissionDecision"] == "ask"

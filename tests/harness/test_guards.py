@@ -465,7 +465,13 @@ MATRIX = [
 
 
 @pytest.mark.parametrize(("variant", "target", "content", "blocked"), MATRIX)
-def test_guard_matrix(variant: str, target: str, content: str, blocked: bool) -> None:
+def test_guard_matrix(
+    variant: str, target: str, content: str, blocked: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _fake_worktree(_path: Path) -> tuple[Path, bool, str]:
+        return (ROOT, True, "feat/matrix")
+
+    monkeypatch.setattr(guards, "_worktree_info", _fake_worktree)
     response = hook.run("claude", "pre", render(variant, target, content))
 
     assert_outcome(response, blocked)
@@ -574,12 +580,15 @@ def test_relative_shell_redirection_into_global_gemini_config_is_blocked(fake_ho
 
 
 def test_hook_registers_all_guards() -> None:
-    names = [guard.__name__ for guard in guards.ALL]
+    names = [guard.__name__ for guard in (*guards.ALL, *guards.CONFIRM)]
     core = tomllib.loads((ROOT / "harness" / "core.toml").read_text(encoding="utf-8"))
     baseline = core["controls"]["required_guards"]
 
     assert hook.GUARDS == guards.ALL
-    assert len(guards.ALL) == 8
+    assert hook.CONFIRM_GUARDS == guards.CONFIRM
+    assert len(guards.ALL) == 9
+    assert len(guards.CONFIRM) == 1
+    assert guards.CONFIRM[0] is guards.pr_confirmation
     assert guards.ALL[-1] is guards.harness_integrity
     assert guards.ALL.index(guards.subagent_routing) < guards.ALL.index(guards.harness_integrity)
     assert names == list(baseline)
@@ -1043,7 +1052,13 @@ def test_win32_extended_length_paths_to_cli_and_hooks_are_blocked(
 
 
 @pytest.mark.parametrize("tool", sorted(guards.FULL_WRITE_TOOLS))
-def test_invalid_syntax_full_write_to_check_tamper_is_blocked(tool: str) -> None:
+def test_invalid_syntax_full_write_to_check_tamper_is_blocked(
+    tool: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _fake_worktree(_path: Path) -> tuple[Path, bool, str]:
+        return (ROOT, True, "feat/matrix")
+
+    monkeypatch.setattr(guards, "_worktree_info", _fake_worktree)
     target = str(ROOT / "scripts" / "harness" / "check_tamper.py")
     raw = (
         render(tool, target, "def broken(:\n")
@@ -1430,3 +1445,299 @@ def test_block_reason_privacy() -> None:
     denied = denied_reason(response)
     assert sensitive_prompt not in denied
     assert "flash" in denied
+
+
+@pytest.mark.parametrize("use_relative_gitdir", [False, True])
+def test_repo_relative_linked_worktree_resolves_and_protects(
+    tmp_path: Path, use_relative_gitdir: bool
+) -> None:
+    main_repo = tmp_path / "main_repo"
+    wt_admin = main_repo / ".git" / "worktrees" / "wt-feat"
+    wt_admin.mkdir(parents=True)
+    wt_feat = tmp_path / "wt-feat"
+    wt_feat.mkdir()
+    gitdir = "../main_repo/.git/worktrees/wt-feat" if use_relative_gitdir else str(wt_admin)
+    (wt_feat / ".git").write_text(f"gitdir: {gitdir}\n", encoding="utf-8")
+
+    assert (
+        guards.repo_relative(str(wt_feat / ".claude/settings.json"), str(wt_feat), root=main_repo)
+        == ".claude/settings.json"
+    )
+    assert guards.repo_relative(".claude/settings.json", str(wt_feat), root=main_repo) == (
+        ".claude/settings.json"
+    )
+
+    hook_event = Event(
+        agent="claude",
+        event="pre",
+        kind="write",
+        tool="Write",
+        paths=(str(wt_feat / ".claude/settings.json"),),
+        content="{}\n",
+        cwd=str(wt_feat),
+    )
+    cli_event = Event(
+        agent="claude",
+        event="pre",
+        kind="write",
+        tool="Write",
+        paths=(str(wt_feat / "scripts/harness/cli.py"),),
+        content="x = 1\n",
+        cwd=str(wt_feat),
+    )
+    assert guards.privileged_config(hook_event, root=main_repo) is not None
+    assert guards.harness_integrity(cli_event, root=main_repo) is not None
+
+
+def test_repo_relative_foreign_worktree_returns_none(tmp_path: Path) -> None:
+    main_repo = tmp_path / "main_repo"
+    (main_repo / ".git" / "worktrees").mkdir(parents=True)
+    other_repo = tmp_path / "other_repo"
+    other_admin = other_repo / ".git" / "worktrees" / "other-wt"
+    other_admin.mkdir(parents=True)
+    other_wt = tmp_path / "other-wt"
+    other_wt.mkdir()
+    (other_wt / ".git").write_text(f"gitdir: {other_admin}\n", encoding="utf-8")
+
+    assert (
+        guards.repo_relative(str(other_wt / ".claude/settings.json"), str(other_wt), root=main_repo)
+        is None
+    )
+    assert (
+        guards.repo_relative(
+            str(other_wt / "scripts/harness/cli.py"), str(other_wt), root=main_repo
+        )
+        is None
+    )
+
+
+def _setup_worktree_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
+    """Create simulated main checkout, linked feature/main worktrees, and an outside dir."""
+    main_repo = tmp_path / "main_repo"
+    (main_repo / ".git" / "worktrees" / "wt-feat").mkdir(parents=True)
+    (main_repo / ".git" / "worktrees" / "wt-main").mkdir(parents=True)
+    (main_repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+
+    wt_feat = tmp_path / "wt-feat"
+    wt_feat.mkdir()
+    (wt_feat / ".git").write_text(
+        f"gitdir: {main_repo / '.git' / 'worktrees' / 'wt-feat'}\n", encoding="utf-8"
+    )
+    (main_repo / ".git" / "worktrees" / "wt-feat" / "HEAD").write_text(
+        "ref: refs/heads/feat/x\n", encoding="utf-8"
+    )
+
+    wt_main = tmp_path / "wt-main"
+    wt_main.mkdir()
+    (wt_main / ".git").write_text("gitdir: ../main_repo/.git/worktrees/wt-main\n", encoding="utf-8")
+    (main_repo / ".git" / "worktrees" / "wt-main" / "HEAD").write_text(
+        "ref: refs/heads/main\n", encoding="utf-8"
+    )
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    return main_repo, wt_feat, wt_main, outside
+
+
+@pytest.mark.parametrize("branch", ["main", "feat/x"])
+def test_git_workflow_blocks_write_in_main_checkout(tmp_path: Path, branch: str) -> None:
+    main_repo, _, _, _ = _setup_worktree_fixture(tmp_path)
+    (main_repo / ".git" / "HEAD").write_text(f"ref: refs/heads/{branch}\n", encoding="utf-8")
+    event = Event(
+        agent="claude",
+        event="pre",
+        kind="write",
+        tool="Write",
+        paths=(str(main_repo / "foo.py"),),
+        content="x = 1\n",
+        cwd=str(main_repo),
+    )
+
+    reason = guards.git_workflow(event, root=main_repo)
+
+    assert reason is not None
+    assert "worktree" in reason
+
+
+def test_git_workflow_allows_write_in_linked_feature_worktree(tmp_path: Path) -> None:
+    main_repo, wt_feat, _, _ = _setup_worktree_fixture(tmp_path)
+    event = Event(
+        agent="claude",
+        event="pre",
+        kind="write",
+        tool="Write",
+        paths=(str(wt_feat / "foo.py"),),
+        content="x = 1\n",
+        cwd=str(wt_feat),
+    )
+
+    assert guards.git_workflow(event, root=main_repo) is None
+
+
+@pytest.mark.parametrize("branch", ["main", "master"])
+def test_git_workflow_blocks_write_in_linked_protected_branch(tmp_path: Path, branch: str) -> None:
+    main_repo, _, wt_main, _ = _setup_worktree_fixture(tmp_path)
+    (main_repo / ".git" / "worktrees" / "wt-main" / "HEAD").write_text(
+        f"ref: refs/heads/{branch}\n", encoding="utf-8"
+    )
+    event = Event(
+        agent="claude",
+        event="pre",
+        kind="write",
+        tool="Write",
+        paths=(str(wt_main / "foo.py"),),
+        content="x = 1\n",
+        cwd=str(wt_main),
+    )
+
+    reason = guards.git_workflow(event, root=main_repo)
+
+    assert reason is not None
+    assert branch in reason
+
+
+def test_git_workflow_allows_write_outside_git_repo(tmp_path: Path) -> None:
+    main_repo, _, _, outside = _setup_worktree_fixture(tmp_path)
+    event = Event(
+        agent="claude",
+        event="pre",
+        kind="write",
+        tool="Write",
+        paths=(str(outside / "foo.py"),),
+        content="x = 1\n",
+        cwd=str(outside),
+    )
+
+    assert guards.git_workflow(event, root=main_repo) is None
+
+
+@pytest.mark.parametrize(
+    ("target", "blocked"),
+    [
+        ("main", True),
+        ("wt_feat", False),
+        ("wt_main", True),
+    ],
+)
+def test_git_workflow_commit_policy_by_worktree(tmp_path: Path, target: str, blocked: bool) -> None:
+    main_repo, wt_feat, wt_main, _ = _setup_worktree_fixture(tmp_path)
+    dirs = {"main": main_repo, "wt_feat": wt_feat, "wt_main": wt_main}
+    event = Event(
+        agent="claude",
+        event="pre",
+        kind="shell",
+        tool="run_command",
+        command='git commit -m "msg"',
+        cwd=str(dirs[target]),
+    )
+
+    reason = guards.git_workflow(event, root=main_repo)
+
+    assert (reason is not None) is blocked
+
+
+def test_git_workflow_respects_git_dash_c_on_commit(tmp_path: Path) -> None:
+    main_repo, wt_feat, _, _ = _setup_worktree_fixture(tmp_path)
+    allow_event = Event(
+        agent="claude",
+        event="pre",
+        kind="shell",
+        tool="run_command",
+        command=f'git -C "{wt_feat}" commit -m "msg"',
+        cwd=str(main_repo),
+    )
+    block_event = Event(
+        agent="claude",
+        event="pre",
+        kind="shell",
+        tool="run_command",
+        command=f'git -C "{main_repo}" commit -m "msg"',
+        cwd=str(wt_feat),
+    )
+
+    assert guards.git_workflow(allow_event, root=main_repo) is None
+    assert guards.git_workflow(block_event, root=main_repo) is not None
+
+
+@pytest.mark.parametrize(
+    ("location", "command", "blocked"),
+    [
+        ("wt_feat", "git push origin main", True),
+        ("wt_feat", "git push origin feat/x:master", True),
+        ("wt_feat", "git push origin feat/x:refs/heads/master", True),
+        ("wt_feat", "git push origin refs/heads/main", True),
+        ("wt_main", "git push", True),
+        ("main", "git push", True),
+        ("wt_feat", "git push -u origin feat/x", False),
+    ],
+)
+def test_git_workflow_push_policy(
+    tmp_path: Path, location: str, command: str, blocked: bool
+) -> None:
+    main_repo, wt_feat, wt_main, _ = _setup_worktree_fixture(tmp_path)
+    dirs = {"main": main_repo, "wt_feat": wt_feat, "wt_main": wt_main}
+    event = Event(
+        agent="claude",
+        event="pre",
+        kind="shell",
+        tool="run_command",
+        command=command,
+        cwd=str(dirs[location]),
+    )
+
+    reason = guards.git_workflow(event, root=main_repo)
+
+    assert (reason is not None) is blocked
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git status",
+        "git worktree add ../wt-x -b feat/x main",
+    ],
+)
+def test_git_workflow_allows_status_and_worktree_add_in_main_checkout(
+    tmp_path: Path, command: str
+) -> None:
+    main_repo, _, _, _ = _setup_worktree_fixture(tmp_path)
+    event = Event(
+        agent="claude",
+        event="pre",
+        kind="shell",
+        tool="run_command",
+        command=command,
+        cwd=str(main_repo),
+    )
+
+    assert guards.git_workflow(event, root=main_repo) is None
+
+
+@pytest.mark.parametrize(
+    ("tool", "kind", "command", "needs_confirm"),
+    [
+        ("run_command", "shell", "gh pr create --title x", True),
+        ("run_command", "shell", "gh pr list", False),
+        ("run_command", "shell", "gh pr view 12", False),
+        ("run_command", "shell", "python plugin/scripts/pr_via_rest_api.py --title x", True),
+        (
+            "run_command",
+            "shell",
+            "python plugin/scripts/pr_via_rest_api.py --request-approval --title x",
+            False,
+        ),
+        ("run_command", "shell", "python tools/watch_worktree.py publish --slug x", True),
+        ("mcp_github_create_pull_request", "other", "", True),
+        ("github_open_pull_request", "other", "", True),
+        ("create_pr", "other", "", True),
+        ("mcp_github_list_pull_requests", "other", "", False),
+    ],
+)
+def test_pr_confirmation_triggers_on_pr_creation(
+    tool: str, kind: str, command: str, needs_confirm: bool
+) -> None:
+    event = Event(agent="claude", event="pre", tool=tool, kind=kind, command=command)
+
+    reason = guards.pr_confirmation(event)
+
+    assert (reason is not None) is needs_confirm
