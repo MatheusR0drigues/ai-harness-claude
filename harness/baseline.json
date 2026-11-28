@@ -12,7 +12,7 @@
     "scripts/harness/config.py": "c9a4a39dd0a93222386190f2c49e6effaf32674d509f01268d4b8f4f5c5fdf2b",
     "scripts/harness/dialect.py": "057a4f0faffea3851c353ed392b0c650c360af5c7c32b2a7e6d7197a7f175f1d",
     "scripts/harness/doctor.py": "45361d2afaf5c15f5e23a2440e106bc736f8b6257b62875ef694c2cb52ada5d6",
-    "scripts/harness/guards.py": "17dbbd402021d714ddb3b2a45cb26d842d9a82c542691b8159a27ac7f48549de",
+    "scripts/harness/guards.py": "53696f7fe975b0c7d5d4f7f56faa312df3667b15677890fcd39e1a796826823f",
     "scripts/harness/hook.py": "ce5d6a131d43f45e488262dbb9dea19339c42d9ae494651ce1075ed9429db10e",
     "scripts/harness/init.py": "2158565d0b471fe0858928c5988c2aa0f641032c91402965ed548861eca80c21",
     "scripts/harness/install_global.py": "39eda0e416ea467e8c873d9cfff3853b2503b978e3862cf7db7d74006d730f2a",

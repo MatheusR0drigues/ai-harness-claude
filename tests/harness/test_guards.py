@@ -117,6 +117,23 @@ CASES = [
     ("shell", "git branch -D old", "", True),
     ("shell", "git branch -d merged", "", False),
     ("shell", "git commit --no-verify -m x", "", True),
+    ("shell", "git commit --no-verif -m x", "", True),
+    ("shell", "git push --no-verify origin feat/x", "", True),
+    ("shell", "git push origin feat/x --no-verify", "", True),
+    ("shell", "git merge --no-verify feat/x", "", True),
+    ("shell", "git rebase --no-verify main", "", True),
+    ("shell", "git pull --no-verify origin feat/x", "", True),
+    ("shell", "git am --no-verify fix.patch", "", True),
+    ("shell", "git push -n origin feat/x", "", False),
+    ("shell", "git push --dry-run origin feat/x", "", False),
+    ("shell", "git merge -n feat/x", "", False),
+    ("shell", "git rebase -n main", "", False),
+    ("shell", "git push -o --no-verify origin feat/x", "", False),
+    ("shell", "git push origin -- --no-verify", "", False),
+    ("shell", "if true; then git push --no-verify origin feat/x; fi", "", True),
+    ("shell", "time git push --force origin feat/x", "", True),
+    ("shell", "case x in x) git push --force origin feat/x;; esac", "", True),
+    ("shell", "f() { git push --no-verify origin feat/x; }; f", "", True),
     ("shell", "git config user.name someone", "", True),
     ("shell", "git config --get user.name", "", False),
     ("shell", "rm -rf build", "", True),
@@ -1688,6 +1705,136 @@ def test_git_workflow_push_policy(
     reason = guards.git_workflow(event, root=main_repo)
 
     assert (reason is not None) is blocked
+
+
+@pytest.mark.parametrize(
+    ("location", "command", "blocked"),
+    [
+        # Bash-style chains: the `cd` before `git` decides where the commit lands.
+        ("wt_feat", 'cd "{main}" && git commit -m x', True),
+        ("wt_feat", 'cd "{main}"; git commit -m x', True),
+        ("wt_feat", 'cd "{main}" || git commit -m x', True),
+        ("wt_feat", 'cd "{main}"\ngit commit -m x', True),
+        ("wt_feat", 'pushd "{main}" && git commit -m x', True),
+        ("wt_feat", 'chdir "{main}" && git commit -m x', True),
+        ("main", 'cd "{wt_feat}" && git commit -m x', False),
+        ("main", 'pushd "{wt_feat}" && git commit -m x', False),
+        ("wt_feat", 'pushd "{main}" && popd && git commit -m x', False),
+        ("wt_feat", 'cd "{main}" && cd "{wt_feat}" && git commit -m x', False),
+        ("wt_feat", 'cd "{main}" && git status', False),
+        # PowerShell location cmdlets and aliases.
+        ("wt_feat", 'Set-Location "{main}"; git commit -m x', True),
+        ("wt_feat", 'Set-Location -Path "{main}"; git commit -m x', True),
+        ("wt_feat", 'sl "{main}"; git commit -m x', True),
+        ("wt_feat", 'Push-Location "{main}"; git commit -m x', True),
+        ("main", 'Set-Location -LiteralPath "{wt_feat}"; git commit -m x', False),
+        # Relative paths resolve against the directory of the chain so far.
+        ("wt_feat", "cd ../main_repo && git commit -m x", True),
+        ("wt_feat", "Set-Location ..\\main_repo; git commit -m x", True),
+        ("main", "cd ../wt-feat && git commit -m x", False),
+        ("main", "cd .. && cd wt-feat && git commit -m x", False),
+        ("wt_feat", "cd ../main_repo && git push", True),
+        ("wt_feat", "cd ../wt-main && git push origin HEAD", True),
+        ("outside", "cd ../wt-feat && git push origin feat/x", False),
+        ("outside", "cd ../wt-feat && git push", False),
+        # Values that cannot be resolved statically fail closed for commit and push.
+        ("wt_feat", "cd $X && git commit -m x", True),
+        ("wt_feat", 'cd "$(git rev-parse --show-toplevel)" && git commit -m x', True),
+        ("wt_feat", "cd && git commit -m x", True),
+        ("wt_feat", "cd ~ && git commit -m x", True),
+        ("wt_feat", "cd - && git commit -m x", True),
+        ("wt_feat", "popd && git commit -m x", True),
+        ("wt_feat", "Set-Location $env:X; git push origin feat/x", True),
+        ("wt_feat", "cd $X && git status", False),
+        ("wt_feat", 'cd $X && git -C "{wt_feat}" commit -m x', False),
+        # A `cd` in a subshell, pipeline or background job does not reliably persist.
+        ("main", '(cd "{wt_feat}") && git commit -m x', True),
+        ("main", '(echo x; cd "{wt_feat}"; echo y) && git commit -m x', True),
+        ("main", 'cd "{wt_feat}" | cat; git commit -m x', True),
+        ("main", 'cd "{wt_feat}" & git commit -m x', True),
+        ("main", 'bash -c "cd {wt_feat}"; git commit -m x', True),
+        # Nested shells track their own chain.
+        ("wt_feat", 'bash -c "cd {main} && git commit -m x"', True),
+        ("main", 'bash -c "cd {wt_feat} && git commit -m x"', False),
+        # Shell prefixes and compound commands do not hide the `cd` or the `git`.
+        ("wt_feat", 'builtin cd "{main}" && git commit -m x', True),
+        ("wt_feat", 'builtin cd "{main}" && git push', True),
+        ("wt_feat", 'cd "{main}" && time git commit -m x', True),
+        ("wt_feat", 'cd "{main}"; if true; then git commit -m x; fi', True),
+        ("wt_feat", 'cd "{main}"; for i in 1; do git commit -m x; done', True),
+        ("wt_feat", 'if true; then cd "{main}"; fi; git commit -m x', True),
+        ("main", 'if true; then cd "{wt_feat}"; fi; git commit -m x', True),
+        ("wt_feat", 'cd "{main}"; if ($true) {{ git commit -m x }}', True),
+        ("wt_feat", 'if ($true) {{ Set-Location "{main}" }}; git commit -m x', True),
+        ("main", "if true; then git commit -m x; fi", True),
+        ("wt_feat", 'cd "{main}"; case x in x) git commit -m x;; esac', True),
+        ("wt_feat", 'case x in y) true;; x) cd "{main}";; esac; git commit -m x', True),
+        ("wt_feat", 'cd "{main}"; f() {{ git commit -m x; }}; f', True),
+        ("wt_feat", 'f() {{ git commit -m x; }}; cd "{main}"; f', True),
+        ("wt_feat", "function f {{ git push; }}; f", True),
+        ("wt_feat", "function f {{ git status; }}; f; git commit -m x", False),
+        # Redirections with `&` are not background jobs.
+        ("main", 'cd "{wt_feat}" 2>&1 && git commit -m x', False),
+        ("main", 'cd "{wt_feat}" >/dev/null 2>&1; git push origin feat/x', False),
+    ],
+)
+def test_git_workflow_tracks_directory_changes_in_chained_commands(
+    tmp_path: Path, location: str, command: str, blocked: bool
+) -> None:
+    main_repo, wt_feat, wt_main, outside = _setup_worktree_fixture(tmp_path)
+    dirs = {"main": main_repo, "wt_feat": wt_feat, "wt_main": wt_main, "outside": outside}
+    event = Event(
+        agent="claude",
+        event="pre",
+        kind="shell",
+        tool="run_command",
+        command=command.format(main=main_repo.as_posix(), wt_feat=wt_feat.as_posix()),
+        cwd=str(dirs[location]),
+    )
+
+    reason = guards.git_workflow(event, root=main_repo)
+
+    assert (reason is not None) is blocked
+
+
+@pytest.mark.parametrize(
+    ("guard", "command"),
+    [
+        ("privileged_config", "cd .claude && git diff --output settings.json"),
+        ("privileged_config", "cd .claude; git diff --output=settings.local.json"),
+        ("harness_integrity", "cd scripts/harness && git diff --output guards.py"),
+        ("harness_integrity", "Set-Location scripts; git show HEAD -o harness/hook.py"),
+    ],
+)
+def test_git_output_guards_resolve_against_chained_cd(guard: str, command: str) -> None:
+    event = Event(
+        agent="claude",
+        event="pre",
+        kind="shell",
+        tool="run_command",
+        command=command,
+        cwd=str(ROOT),
+    )
+
+    reason = getattr(guards, guard)(event)
+
+    assert reason is not None
+
+
+def test_git_workflow_chained_cd_blocks_through_dispatcher(tmp_path: Path) -> None:
+    main_repo, wt_feat, _, _ = _setup_worktree_fixture(tmp_path)
+    event = Event(
+        agent="claude",
+        event="pre",
+        kind="shell",
+        tool="run_command",
+        command=f'cd "{main_repo.as_posix()}" && git commit -m x',
+        cwd=str(wt_feat),
+    )
+
+    response = hook.handle_pre(event, [lambda e: guards.git_workflow(e, root=main_repo)])
+
+    assert "commits must happen in a dedicated git worktree" in denied_reason(response)
 
 
 @pytest.mark.parametrize(
